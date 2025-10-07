@@ -1,7 +1,7 @@
 import streamlit as st
 
 def landing():
-    st.title("🏁 iRacing – Stint Control")
+    st.title("🏁 24hlan 2025 – Stint Control")
     st.write("Vælg adgang:")
 
     c1, c2, c3 = st.columns(3)

@@ -37,7 +37,7 @@ def admin_panel():
     with st.expander("🗂️ Importér / Reset database fra CSV (lokal fil)", expanded=False):
         file = st.file_uploader("Vælg CSV", type=["csv"], key="local_csv")
         if file is not None:
-            df = pd.read_csv(file)
+            df = pd.read_csv(file, encoding="utf-8-sig")  
             st.write("Forhåndsvisning:", df.head())
             cols = df.columns.tolist()
 
@@ -160,6 +160,9 @@ def admin_panel():
                     st.rerun()
                 except Exception as e:
                     st.error(f"Kunne ikke slette databasen: {e}")
+                    
+                    df = pd.read_csv(file, encoding="utf-8-sig")
+
 
     # ─────────────────────────────────────────────────────────────────────────────
     # 3) Status og styring
@@ -221,7 +224,14 @@ def admin_panel():
         csv = hist.to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Download historik (CSV)", csv, file_name=f"{team_name}_stints.csv",
                            mime="text/csv", key="admin_hist_dl")
+
+    # ←–––––––––––––––––––––––––––––––––––––––––––––––––––––
+    # LOG UD – placeret lige efter “Status og styring”
+    # ––––––––––––––––––––––––––––––––––––––––––––––––––––→
     st.divider()
+    if st.button("🔒 Log ud", type="secondary", key="admin_logout"):
+        st.session_state.view = "LANDING"
+        st.rerun()
 
     # ─────────────────────────────────────────────────────────────────────────────
     # 4) Team passwords (PINs) – nederst
@@ -237,3 +247,38 @@ def admin_panel():
             if st.button("Gem PIN", key=f"savepin_{r.id}"):
                 set_team_pin(int(r.id), new_pin.strip() or "1234")
                 st.success("PIN opdateret")
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # 5) Ret æ/ø/å i databasen (encoding-reparation) – absolut til sidst
+    # ─────────────────────────────────────────────────────────────────────────────
+    with st.expander("🩺 Ret æ/ø/å i databasen (encoding-reparation)"):
+        st.caption(
+            "Brug kun hvis du allerede har importeret med forkerte tegn. "
+            "Kører en simpel mojibake-rettelse på team- og drivernavne."
+        )
+        if st.button("Kør reparation nu", key="run_encoding_fix"):
+            from core.db import get_conn
+            from core.importers import _fix_mojibake
+            fixed = 0
+            with get_conn() as conn:
+                # Ret team
+                team = pd.read_sql_query("SELECT id, name, car_class FROM team;", conn)
+                for r in team.itertuples():
+                    new_name = _fix_mojibake(r.name)
+                    new_class = _fix_mojibake(r.car_class)
+                    if new_name != r.name or new_class != r.car_class:
+                        conn.execute(
+                            "UPDATE team SET name=?, car_class=? WHERE id=?;",
+                            (new_name, new_class, r.id)
+                        )
+                        fixed += 1
+                # Ret driver
+                drv = pd.read_sql_query("SELECT id, name FROM driver;", conn)
+                for r in drv.itertuples():
+                    new_name = _fix_mojibake(r.name)
+                    if new_name != r.name:
+                        conn.execute("UPDATE driver SET name=? WHERE id=?;", (new_name, r.id))
+                        fixed += 1
+                conn.commit()
+            st.success(f"Færdig: Rettede {fixed} rækker.")
+            st.rerun()

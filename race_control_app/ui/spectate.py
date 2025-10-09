@@ -1,15 +1,41 @@
 # ui/spectate.py
+import os, sys, time
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # allow running directly
+
 import pandas as pd
 import streamlit as st
-
-# IMPORTANT: this must exist in core/repo.py (we shared it earlier)
-# def spectate_grid(): ...  # returns columns: team_no, car_class, team_name, driver_name
 from core.repo import spectate_grid
 
 
-def spectate_view():
-    st.header("Spectate")
+AUTO_REFRESH_SECONDS = 30
+TIMER_KEY = "spectate_next_refresh_ts"
 
+
+def _auto_refresh_every(seconds: int, key: str) -> None:
+    """
+    Lightweight auto-refresh without external packages.
+    Refreshes the page when `seconds` have passed since the last refresh.
+    """
+    now = time.time()
+    if key not in st.session_state:
+        # first render — schedule next refresh
+        st.session_state[key] = now + seconds
+        return
+
+    if now >= st.session_state[key]:
+        # schedule the next refresh and rerun
+        st.session_state[key] = now + seconds
+        st.rerun()
+
+
+def spectate_view():
+    st.header("Spectate 👁️")
+
+    # Auto-refresh every 30s
+    _auto_refresh_every(AUTO_REFRESH_SECONDS, TIMER_KEY)
+    st.caption(f"⏳ Opdaterer automatisk hvert {AUTO_REFRESH_SECONDS} sek.")
+
+    # Load data
     try:
         df = spectate_grid()
     except Exception as e:
@@ -21,6 +47,7 @@ def spectate_view():
         st.info("Ingen teams i databasen endnu.")
         return
 
+    # Pretty display
     display = df.rename(
         columns={
             "team_no": "Car no.",
@@ -29,12 +56,20 @@ def spectate_view():
             "driver_name": "Driver Name",
         }
     )
-    # ønsket kolonneorden
+
     cols = ["Car no.", "Class", "Team Name", "Driver Name"]
     display = display.reindex(columns=cols)
 
-    # vis '-' for manglende nummer
-    display["Car no."] = display["Car no."].apply(lambda x: "-" if pd.isna(x) else int(x))
+    # Format car numbers nicely: show '-' when NaN, otherwise int
+    def _fmt_no(v):
+        if pd.isna(v) or str(v).strip() == "":
+            return "-"
+        try:
+            return int(v)
+        except Exception:
+            return str(v)
+
+    display["Car no."] = display["Car no."].apply(_fmt_no)
 
     st.dataframe(display, use_container_width=True, hide_index=True)
 
@@ -48,8 +83,7 @@ def spectate_view():
             st.rerun()
 
 
-# Allow this file to run standalone for testing:
+# Allow running this file directly
 if __name__ == "__main__":
-    # keep it minimal here so we don't depend on your app's setup_page()
     st.set_page_config(page_title="Spectate – iRacing", page_icon="👀", layout="centered")
     spectate_view()

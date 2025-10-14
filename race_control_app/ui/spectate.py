@@ -9,7 +9,7 @@ from datetime import datetime
 
 from core.repo import spectate_grid
 
-REFRESH_SEC = 5  # 30 sekunder
+REFRESH_SEC = 30  # 30 sekunder
 
 def spectate_view():
     st.header("Spectate ")

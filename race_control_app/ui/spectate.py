@@ -8,39 +8,37 @@ import streamlit.components.v1 as components
 
 from core.repo import spectate_grid
 
-REFRESH_MS = 30_000   # 30 sek.
+REFRESH_MS = 5_000   # 30 sek.
 
 def _enable_autorefresh():
     """Brug streamlit-autorefresh hvis tilgængelig, ellers en lille JS-fallback."""
     try:
         from streamlit_autorefresh import st_autorefresh  # lazy import
         # The return value increments on each refresh, triggering Streamlit's reactive rerun
-        count = st_autorefresh(interval=REFRESH_MS, key="spectate_autorefresh")
+        count = st_autorefresh(interval=REFRESH_MS, limit=None, key="spectate_autorefresh")
+        # Debug: Show refresh count (you can remove this later)
+        # st.sidebar.write(f"Refresh count: {count}")
         return count
-    except Exception:
-        # Fallback: Use Streamlit's JavaScript to trigger a rerun instead of full page reload
-        components.html(
-            f"""
-            <script>
-              setTimeout(function () {{
-                  // Use Streamlit's internal rerun mechanism
-                  window.parent.postMessage({{
-                      type: 'streamlit:setComponentValue',
-                      value: Date.now()
-                  }}, '*');
-              }}, {REFRESH_MS});
-            </script>
-            """,
-            height=0, width=0
-        )
+    except ImportError as e:
+        st.error(f"streamlit-autorefresh not installed: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Auto-refresh error: {e}")
         return None
 
 def spectate_view():
-    st.header("Spectate ")
-    st.caption(f"⏱️ Opdaterer automatisk hvert {REFRESH_MS//1000} sek.")
+    st.header("Spectate  👁️")
     
     # Enable auto-refresh at the top of the view
     refresh_count = _enable_autorefresh()
+    
+    # Show refresh status
+    import datetime
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
+    if refresh_count is not None:
+        st.caption(f"⏱️ Opdaterer automatisk hvert {REFRESH_MS//1000} sek. | Sidst opdateret: {current_time} | Refresh #{refresh_count}")
+    else:
+        st.caption(f"⏱️ Auto-refresh ikke tilgængelig | Sidst opdateret: {current_time}")
 
     try:
         df = spectate_grid()

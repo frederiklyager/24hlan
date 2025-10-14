@@ -4,41 +4,34 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # allow "core.*" im
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
+import time
+from datetime import datetime
 
 from core.repo import spectate_grid
 
-REFRESH_MS = 5_000   # 30 sek.
-
-def _enable_autorefresh():
-    """Brug streamlit-autorefresh hvis tilgængelig, ellers en lille JS-fallback."""
-    try:
-        from streamlit_autorefresh import st_autorefresh  # lazy import
-        # The return value increments on each refresh, triggering Streamlit's reactive rerun
-        count = st_autorefresh(interval=REFRESH_MS, limit=None, key="spectate_autorefresh")
-        # Debug: Show refresh count (you can remove this later)
-        # st.sidebar.write(f"Refresh count: {count}")
-        return count
-    except ImportError as e:
-        st.error(f"streamlit-autorefresh not installed: {e}")
-        return None
-    except Exception as e:
-        st.error(f"Auto-refresh error: {e}")
-        return None
+REFRESH_SEC = 5  # 30 sekunder
 
 def spectate_view():
-    st.header("Spectate  👁️")
+    st.header("Spectate ")
     
-    # Enable auto-refresh at the top of the view
-    refresh_count = _enable_autorefresh()
+    # Initialize last_update timestamp in session state
+    if 'spectate_last_update' not in st.session_state:
+        st.session_state.spectate_last_update = time.time()
     
-    # Show refresh status
-    import datetime
-    current_time = datetime.datetime.now().strftime("%H:%M:%S")
-    if refresh_count is not None:
-        st.caption(f"⏱️ Opdaterer automatisk hvert {REFRESH_MS//1000} sek. | Sidst opdateret: {current_time} | Refresh #{refresh_count}")
-    else:
-        st.caption(f"⏱️ Auto-refresh ikke tilgængelig | Sidst opdateret: {current_time}")
+    # Check if it's time to refresh
+    current_time = time.time()
+    time_elapsed = current_time - st.session_state.spectate_last_update
+    
+    if time_elapsed >= REFRESH_SEC:
+        # Update the timestamp and trigger rerun
+        st.session_state.spectate_last_update = current_time
+        st.rerun()
+    
+    # Calculate time until next refresh for display
+    time_until_refresh = int(REFRESH_SEC - time_elapsed)
+    last_updated = datetime.fromtimestamp(st.session_state.spectate_last_update).strftime("%H:%M:%S")
+    
+    st.caption(f"⏱️ Opdaterer automatisk hvert {REFRESH_SEC} sek. | Sidst opdateret: {last_updated} | Næste opdatering om: {time_until_refresh} sek.")
 
     try:
         df = spectate_grid()
@@ -68,11 +61,19 @@ def spectate_view():
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🔄 Opdater"):
+            st.session_state.spectate_last_update = time.time()
             st.rerun()
     with c2:
         if st.button("◀ Tilbage"):
+            # Clean up session state when leaving
+            if 'spectate_last_update' in st.session_state:
+                del st.session_state.spectate_last_update
             st.session_state.view = "LANDING"
             st.rerun()
+    
+    # Sleep briefly and rerun to update the countdown timer
+    time.sleep(1)
+    st.rerun()
 
 if __name__ == "__main__":
     st.set_page_config(page_title="Spectate – iRacing", page_icon="👀", layout="centered")

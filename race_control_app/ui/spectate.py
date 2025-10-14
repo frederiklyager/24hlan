@@ -36,7 +36,7 @@ def _enable_autorefresh():
         return None
 
 def spectate_view():
-    st.header("Spectate  👁️")
+    st.header("Spectate ")
     st.caption(f"⏱️ Opdaterer automatisk hvert {REFRESH_MS//1000} sek.")
     
     # Enable auto-refresh at the top of the view

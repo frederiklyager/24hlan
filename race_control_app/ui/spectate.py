@@ -12,11 +12,20 @@ from core.repo import spectate_grid
 REFRESH_SEC = 30  # 30 sekunder
 
 def spectate_view():
-    st.header("Spectate ")
+    st.header("Spectate  👁️")
     
     # Initialize last_update timestamp in session state
     if 'spectate_last_update' not in st.session_state:
         st.session_state.spectate_last_update = time.time()
+    
+    # Initialize force refresh flag
+    if 'spectate_force_refresh' not in st.session_state:
+        st.session_state.spectate_force_refresh = False
+    
+    # Check if manual refresh was triggered
+    if st.session_state.spectate_force_refresh:
+        st.session_state.spectate_last_update = time.time()
+        st.session_state.spectate_force_refresh = False
     
     # Check if it's time to refresh
     current_time = time.time()
